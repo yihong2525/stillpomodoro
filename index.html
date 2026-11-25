@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Still</title>
+<meta name="description" content="A quieter way to get things done.">
+<meta name="theme-color" content="#101116">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Still">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23101116'/%3E%3Ccircle cx='32' cy='32' r='17' fill='none' stroke='%2330313A' stroke-width='5'/%3E%3Cpath d='M32 15a17 17 0 1 1-17 17' fill='none' stroke='%23B5B5FF' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/*
+VOICE: calm, quiet, premium; few words, lots of air.
+IDEA: a still pond at night; one ring of light that slowly closes.
+PICTURE: the countdown ring itself, centred and large.
+COLOUR and TYPE: charcoal #101116, surface #191A21, off-white, muted grey, one lavender accent. Inter, light digits.
+LAYOUT: single column, header, session, ring, task, controls, daily summary; bottom nav.
+*/
+:root{color-scheme:dark;--bg:#101116;--surface:#191A21;--ink:#F4F4F5;--muted:#92939F;--accent:#B5B5FF;--line:#30313A;
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);--nav:64px;
+  --ease:cubic-bezier(.2,.7,.2,1)}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  overflow-x:clip;-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss01"}
+button,input{font:inherit;color:inherit}
+button{background:none;border:0;padding:0;cursor:pointer;touch-action:manipulation}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:12px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+main{max-width:520px;margin:0 auto;padding:calc(var(--safe-t) + 12px) 22px calc(var(--nav) + var(--safe-b) + 24px)}
+.view{display:none;animation:fade .35s var(--ease)}
+.view.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;min-height:52px}
+.brand{font-size:20px;font-weight:500;letter-spacing:-.01em}
+.date{font-size:13px;color:var(--muted)}
+.iconbtn{width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--muted);transition:background .2s,color .2s,transform .12s}
+.iconbtn:hover{color:var(--ink)}
+.iconbtn:active{transform:scale(.92);background:var(--surface)}
+.iconbtn svg{width:22px;height:22px}
+
+/* session indicator */
+.session{text-align:center;margin-top:clamp(8px,3vh,28px)}
+.phase{font-size:17px;font-weight:500;letter-spacing:-.01em}
+.phase.swap{animation:fade .45s var(--ease)}
+.round{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:4px;font-size:13px;color:var(--muted)}
+.dots{display:flex;gap:5px}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--line);transition:background .3s}
+.dots i.done{background:var(--accent)}
+.dots i.now{background:none;box-shadow:inset 0 0 0 1.5px var(--accent)}
+
+/* ring */
+.ringwrap{position:relative;width:min(76vw,44dvh,320px);aspect-ratio:1;margin:clamp(14px,3.5vh,32px) auto 0;container-type:inline-size}
+.ringwrap svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.track{stroke:var(--line)}
+.prog{stroke:var(--accent);transition:stroke-dashoffset .3s linear,opacity .4s}
+.ringwrap.paused .prog{opacity:.45}
+.ringwrap.kick{animation:kick .6s var(--ease)}
+@keyframes kick{0%{transform:scale(.97)}100%{transform:scale(1)}}
+.ringwrap.done .prog{animation:glow 1.6s var(--ease)}
+@keyframes glow{0%,100%{opacity:1}40%{opacity:.25}}
+.readout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.clock{font-size:clamp(40px,23cqw,76px);font-weight:300;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.state{margin-top:10px;font-size:13px;color:var(--muted);min-height:20px}
+
+/* task */
+.task{display:flex;justify-content:center;margin-top:clamp(12px,2.5vh,24px);min-height:44px}
+.taskbtn{display:flex;align-items:center;gap:8px;max-width:100%;min-height:44px;padding:0 14px;border-radius:22px;color:var(--muted);font-size:15px;transition:background .2s}
+.taskbtn:active{background:var(--surface)}
+.taskbtn.has{color:var(--ink)}
+.taskbtn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.taskbtn svg{width:15px;height:15px;flex:none;opacity:.7}
+.taskedit{display:none;align-items:center;gap:6px;width:100%;max-width:360px}
+.task.editing .taskbtn{display:none}.task.editing .taskedit{display:flex}
+.taskedit input{flex:1;height:44px;padding:0 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface);font-size:16px;outline:none;transition:border-color .2s}
+.taskedit input:focus{border-color:var(--accent)}
+.taskedit .iconbtn{flex:none}
+
+/* banner */
+.note{text-align:center;font-size:14px;color:var(--accent);min-height:0;margin:0 auto;max-width:340px;opacity:0;transition:opacity .4s}
+.note.show{opacity:1;margin-top:10px;min-height:21px}
+
+/* controls */
+.controls{display:flex;align-items:center;justify-content:center;gap:clamp(18px,7vw,32px);margin-top:clamp(14px,3vh,28px)}
+.ctl{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;color:var(--muted);border:1px solid var(--line);transition:transform .12s,color .2s,background .2s,opacity .2s}
+.ctl svg{width:22px;height:22px}
+.ctl:hover{color:var(--ink)}
+.ctl:active{transform:scale(.92);background:var(--surface)}
+.ctl:disabled{opacity:.35;pointer-events:none}
+.main{min-width:148px;height:64px;padding:0 30px;border-radius:32px;background:var(--accent);color:#101116;font-size:17px;font-weight:600;letter-spacing:-.01em;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .12s,background .25s,color .25s}
+.main svg{width:18px;height:18px}
+.main:active{transform:scale(.96)}
+.main.soft{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+
+/* daily summary */
+.today{margin-top:clamp(22px,4.5vh,44px);padding-top:16px;border-top:1px solid var(--line)}
+.today .row{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.today b{color:var(--ink);font-weight:500}
+.bar{height:3px;border-radius:2px;background:var(--line);margin-top:10px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:2px;transition:width .6s var(--ease)}
+
+/* shared screen bits */
+h1{font-size:28px;font-weight:500;letter-spacing:-.02em;margin:8px 0 4px;line-height:1.1}
+h2{font-size:15px;font-weight:500;margin:34px 0 12px;color:var(--ink)}
+.sub{font-size:14px;color:var(--muted);margin:0}
+.figs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.fig b{display:block;font-size:26px;font-weight:400;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.fig span{font-size:13px;color:var(--muted)}
+.goalline{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-top:16px}
+
+/* week chart */
+.chart{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;height:180px;align-items:end;position:relative;padding-top:20px}
+.col{display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end}
+.col .v{font-size:11px;color:var(--muted);height:16px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.col .b{width:100%;max-width:28px;border-radius:6px 6px 2px 2px;background:color-mix(in srgb,var(--accent) 38%,var(--bg));min-height:2px;transition:height .6s var(--ease)}
+.col .b.zero{background:var(--line)}
+.col.now .b{background:var(--accent)}
+.col .d{font-size:12px;color:var(--muted);margin-top:8px}
+.col.now .d{color:var(--ink)}
+.goalmark{position:absolute;left:0;right:0;border-top:1px dashed var(--line);pointer-events:none}
+.goalmark span{position:absolute;right:0;top:-18px;font-size:11px;color:var(--muted);background:var(--bg);padding-left:6px}
+.weeksum{display:flex;gap:28px;margin-top:18px}
+
+/* history */
+.hist{list-style:none;margin:0;padding:0}
+.hist li{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.hist li:last-child{border-bottom:0}
+.hist .t{flex:1;overflow:hidden}
+.hist .t div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+.hist .t div.none{color:var(--muted)}
+.hist .t small{font-size:13px;color:var(--muted)}
+.hist .m{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.empty{padding:28px 0;color:var(--muted);font-size:14px;text-align:center}
+.more{display:block;margin:10px auto 0;min-height:44px;padding:0 18px;border-radius:22px;color:var(--muted);font-size:14px}
+.more:active{background:var(--surface)}
+.more[hidden]{display:none}
+
+/* settings */
+.group{border-top:1px solid var(--line)}
+.set{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.set .lab{flex:1}
+.set .lab div{font-size:15px}
+.set .lab small{display:block;font-size:13px;color:var(--muted)}
+.set .lab small.err{color:#FFB4B4}
+.step{display:flex;align-items:center;gap:4px;flex:none}
+.step button{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--muted);transition:background .15s,color .15s,transform .12s}
+.step button:active{background:var(--surface);color:var(--ink);transform:scale(.92)}
+.step button svg{width:18px;height:18px}
+.step input{width:52px;height:40px;text-align:center;border-radius:10px;border:1px solid transparent;background:var(--surface);font-size:16px;font-variant-numeric:tabular-nums;-moz-appearance:textfield;outline:none}
+.step input:focus{border-color:var(--accent)}
+.step input::-webkit-inner-spin-button,.step input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.switch{position:relative;width:52px;height:32px;flex:none;border-radius:16px;background:var(--line);transition:background .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:var(--ink);transition:transform .2s var(--ease)}
+.switch[aria-checked=true]{background:var(--accent)}
+.switch[aria-checked=true]::after{transform:translateX(20px);background:#101116}
+.fixed{font-size:13px;color:var(--muted);white-space:nowrap}
+.linkbtn{min-height:44px;color:var(--ink);font-size:15px;text-align:left;width:100%}
+.linkbtn.danger{color:#FFB4B4}
+.fine{font-size:13px;color:var(--muted);line-height:1.6;margin:14px 0 0}
+.fine a{color:var(--accent)}
+
+/* bottom nav */
+nav{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);padding-bottom:var(--safe-b);z-index:5}
+nav .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);height:var(--nav)}
+nav a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);text-decoration:none;font-size:11px;font-weight:500;transition:color .2s}
+nav a svg{width:22px;height:22px}
+nav a[aria-current=page]{color:var(--accent)}
+nav a:active svg{transform:scale(.9)}
+
+/* toast + dialog */
+.toast{position:fixed;left:50%;bottom:calc(var(--nav) + var(--safe-b) + 14px);transform:translate(-50%,10px);background:var(--surface);border:1px solid var(--line);color:var(--ink);font-size:14px;padding:12px 18px;border-radius:14px;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s var(--ease);z-index:8;max-width:calc(100vw - 32px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.scrim{position:fixed;inset:0;background:rgba(5,5,8,.6);display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s;z-index:10;padding:16px 16px calc(16px + var(--safe-b))}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:22px;transform:translateY(16px);transition:transform .3s var(--ease)}
+.scrim.show .sheet{transform:none}
+.sheet h3{margin:0 0 6px;font-size:17px;font-weight:500}
+.sheet p{margin:0 0 20px;font-size:14px;color:var(--muted)}
+.sheet .acts{display:flex;gap:10px}
+.sheet .acts button{flex:1;height:48px;border-radius:14px;font-weight:500;transition:transform .12s}
+.sheet .acts button:active{transform:scale(.97)}
+.sheet .cancel{background:var(--bg);border:1px solid var(--line)}
+.sheet .ok{background:var(--accent);color:#101116}
+.sheet .ok.danger{background:#FFB4B4}
+
+@media (min-width:700px){main{padding-top:calc(var(--safe-t) + 28px)}}
+main{padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px))}
+
+/* phone held sideways: ring on the left, everything else beside it */
+@media (orientation:landscape) and (max-height:560px){
+  :root{--nav:52px}
+  main{max-width:920px;padding-top:calc(var(--safe-t) + 8px)}
+  nav .in{max-width:920px}
+  nav a{flex-direction:row;gap:8px;font-size:13px}
+  nav a svg{width:20px;height:20px}
+  #v-focus.on{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:clamp(24px,6vw,64px);align-items:center;
+    grid-template-areas:"ring top" "ring session" "ring task" "ring note" "ring controls" "ring today";
+    grid-template-rows:auto auto auto auto auto auto;align-content:center;min-height:calc(100dvh - var(--nav) - var(--safe-b) - var(--safe-t) - 32px)}
+  #v-focus .top{grid-area:top;min-height:44px}
+  #v-focus .session{grid-area:session;text-align:left;margin-top:6px}
+  #v-focus .round{justify-content:flex-start}
+  #v-focus .ringwrap{grid-area:ring;width:min(calc(100dvh - var(--nav) - var(--safe-b) - var(--safe-t) - 48px),44vw,340px);margin:0}
+  #v-focus .task{grid-area:task;justify-content:flex-start;margin-top:8px}
+  #v-focus .taskbtn{padding-left:0}
+  #v-focus .note{grid-area:note;text-align:left;margin-left:0;max-width:none}
+  #v-focus .note.show{margin-top:4px}
+  #v-focus .controls{grid-area:controls;justify-content:flex-start;gap:18px;margin-top:12px}
+  #v-focus .today{grid-area:today;margin-top:16px;padding-top:12px}
+  .toast{bottom:calc(var(--nav) + var(--safe-b) + 10px)}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <!-- FOCUS -->
+  <section class="view" id="v-focus" aria-labelledby="brand">
+    <header class="top">
+      <div>
+        <div class="brand" id="brand">Still</div>
+        <div class="date" id="today-date"></div>
+      </div>
+      <a class="iconbtn" href="#preferences" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </a>
+    </header>
+
+    <div class="session">
+      <div class="phase" id="phase" aria-live="polite">Focus</div>
+      <div class="round"><span id="round">Session 1 of 4</span><span class="dots" id="dots" aria-hidden="true"></span></div>
+    </div>
+
+    <div class="ringwrap" id="ring">
+      <svg viewBox="0 0 300 300" aria-hidden="true">
+        <circle class="track" cx="150" cy="150" r="140" fill="none" stroke-width="5"/>
+        <circle class="prog" id="prog" cx="150" cy="150" r="140" fill="none" stroke-width="5" stroke-linecap="round"/>
+      </svg>
+      <div class="readout">
+        <div class="clock" id="clock" role="timer" aria-label="Time remaining">25:00</div>
+        <div class="state" id="state">Ready</div>
+      </div>
+    </div>
+
+    <div class="task" id="task">
+      <button class="taskbtn" id="task-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>
+        <span id="task-text">What are you working on?</span>
+      </button>
+      <form class="taskedit" id="task-form" autocomplete="off">
+        <label class="sr" for="task-input">Current task</label>
+        <input id="task-input" maxlength="80" placeholder="What are you working on?" enterkeyhint="done">
+        <button class="iconbtn" type="button" id="task-clear" aria-label="Clear task">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </form>
+    </div>
+
+    <p class="note" id="note" role="status"></p>
+
+    <div class="controls">
+      <button class="ctl" id="btn-reset" type="button" aria-label="Reset session">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>
+      </button>
+      <button class="main" id="btn-main" type="button">Start</button>
+      <button class="ctl" id="btn-skip" type="button" aria-label="Skip to next session">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l8 6-8 6z"/><path d="M18 6v12"/></svg>
+      </button>
+    </div>
+
+    <div class="today" aria-label="Today">
+      <div class="row"><span><b id="d-count">0</b> <span id="d-unit">sessions</span></span><span><b id="d-time">0m</b> focused</span><span><b id="d-pct">0%</b> of goal</span></div>
+      <div class="bar"><i id="d-bar"></i></div>
+    </div>
+  </section>
+
+  <!-- STATISTICS -->
+  <section class="view" id="v-stats" aria-labelledby="h-stats">
+    <h1 id="h-stats">Statistics</h1>
+    <p class="sub">Calculated from your completed focus sessions.</p>
+
+    <h2>Today</h2>
+    <div class="figs">
+      <div class="fig"><b id="s-count">0</b><span>Sessions</span></div>
+      <div class="fig"><b id="s-time">0m</b><span>Focus time</span></div>
+      <div class="fig"><b id="s-pct">0%</b><span>Of daily goal</span></div>
+    </div>
+    <div class="goalline"><span id="s-goaltext">0m of 2h goal</span><span id="s-left"></span></div>
+    <div class="bar"><i id="s-bar"></i></div>
+
+    <h2>This week</h2>
+    <div class="chart" id="chart" role="img" aria-label="Focus time per day this week"></div>
+    <div class="weeksum">
+      <div class="fig"><b id="w-total">0m</b><span>Total</span></div>
+      <div class="fig"><b id="w-avg">0m</b><span>Daily average</span></div>
+    </div>
+
+    <h2>Recent sessions</h2>
+    <ul class="hist" id="hist"></ul>
+    <button class="more" id="hist-more" type="button" hidden>Show more</button>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="v-prefs" aria-labelledby="h-prefs">
+    <h1 id="h-prefs">Settings</h1>
+    <p class="sub">Changes apply from the next session you start.</p>
+
+    <h2>Timer</h2>
+    <div class="group" id="g-timer"></div>
+
+    <h2>Daily goal</h2>
+    <div class="group" id="g-goal"></div>
+
+    <h2>Session behaviour</h2>
+    <div class="group">
+      <div class="set"><div class="lab"><div>Manual transitions</div><small>When a session ends, the next one waits for you to press Start.</small></div><span class="fixed">Always on</span></div>
+      <div class="set"><div class="lab"><div>Notify when a session ends</div><small id="notify-hint">Shows a system notification where your browser allows it.</small></div><button class="switch" id="sw-notify" role="switch" aria-checked="false" aria-label="Notify when a session ends"></button></div>
+      <div class="set"><div class="lab"><div>Chime and vibration</div><small>A soft sound when a session ends while Still is open.</small></div><button class="switch" id="sw-sound" role="switch" aria-checked="true" aria-label="Chime and vibration"></button></div>
+    </div>
+
+    <h2>Data</h2>
+    <div class="group">
+      <div class="set"><button class="linkbtn" id="btn-defaults" type="button">Restore default settings</button></div>
+      <div class="set"><button class="linkbtn danger" id="btn-clear" type="button">Clear session history</button></div>
+    </div>
+
+    <h2>About</h2>
+    <p class="fine">Still keeps everything on this device. No account, nothing sent anywhere.</p>
+    <p class="fine" id="env-note"></p>
+    <p class="fine">The timer is based on clock time, so it stays accurate when you switch apps or lock your phone, and catches up the moment you return. Phones pause web apps in the background, though, so the end-of-session notification can arrive late or not until you reopen Still, especially on iPhone.</p>
+  </section>
+</main>
+
+<nav aria-label="Sections"><div class="in">
+  <a href="#focus" data-v="focus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Focus</a>
+  <a href="#statistics" data-v="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 20V11M12 20V5M19 20v-6"/></svg>Statistics</a>
+  <a href="#preferences" data-v="prefs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings</a>
+</div></nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+  <h3 id="dlg-title"></h3><p id="dlg-body"></p>
+  <div class="acts"><button class="cancel" id="dlg-cancel" type="button">Cancel</button><button class="ok" id="dlg-ok" type="button">OK</button></div>
+</div></div>
+
+<!-- ENGINE:START -->
+<script>
+/* Still timer engine. No DOM access: the clock and storage are injected so it can be tested. */
+var StillEngine = (function () {
+  var DEFAULTS = { focus: 25, short: 5, long: 15, rounds: 4, goal: 120, notify: false, sound: true };
+  var LIMITS = { focus: [1, 120], short: [1, 60], long: [1, 90], rounds: [1, 12], goal: [5, 960] };
+  var MIN = 60000, HISTORY_CAP = 5000;
+
+  function clampSetting(key, v) {
+    var lim = LIMITS[key];
+    var n = typeof v === 'string' && v.trim() === '' ? NaN : Number(v);
+    if (!isFinite(n)) return null;
+    n = Math.round(n);
+    return Math.min(lim[1], Math.max(lim[0], n));
+  }
+  function cleanSettings(raw) {
+    var s = {}, k;
+    raw = raw && typeof raw === 'object' ? raw : {};
+    for (k in LIMITS) { var c = clampSetting(k, raw[k]); s[k] = c === null ? DEFAULTS[k] : c; }
+    s.notify = typeof raw.notify === 'boolean' ? raw.notify : DEFAULTS.notify;
+    s.sound = typeof raw.sound === 'boolean' ? raw.sound : DEFAULTS.sound;
+    return s;
+  }
+  var seq = 0;
+  function uid(now) { seq = (seq + 1) % 1e6; return now.toString(36) + '-' + seq.toString(36) + '-' + Math.random().toString(36).slice(2, 7); }
+  function validEntry(h) {
+    return h && typeof h.id === 'string' && isFinite(h.end) && isFinite(h.duration) && h.duration > 0;
+  }
+
+  function create(opts) {
+    var now = opts.now || function () { return Date.now(); };
+    var store = opts.store;
+    var settings, history, timer, task;
+
+    function durationFor(phase) { return settings[phase] * MIN; }
+    function fresh(phase, round) {
+      var d = durationFor(phase);
+      return { id: uid(now()), phase: phase, round: round, status: 'idle', duration: d, remaining: d, endAt: null, startedAt: null, ended: null };
+    }
+    function cleanTimer(t) {
+      if (!t || typeof t !== 'object') return null;
+      if (['focus', 'short', 'long'].indexOf(t.phase) < 0) return null;
+      if (['idle', 'running', 'paused'].indexOf(t.status) < 0) return null;
+      if (!isFinite(t.duration) || t.duration <= 0 || typeof t.id !== 'string') return null;
+      if (t.status === 'running' && !isFinite(t.endAt)) return null;
+      if (t.status !== 'running' && !isFinite(t.remaining)) return null;
+      t.round = Math.max(1, Math.min(settings.rounds, Math.round(t.round) || 1));
+      t.remaining = Math.max(0, Math.min(t.duration, t.remaining || 0));
+      return t;
+    }
+    function load() {
+      settings = cleanSettings(store.get('settings'));
+      var h = store.get('history');
+      history = Array.isArray(h) ? h.filter(validEntry) : [];
+      timer = cleanTimer(store.get('timer')) || fresh('focus', 1);
+      task = typeof store.get('task') === 'string' ? store.get('task') : '';
+    }
+    function saveTimer() { store.set('timer', timer); }
+    function saveHistory() { store.set('history', history); }
+
+    function remaining() {
+      if (timer.status === 'running') return Math.max(0, timer.endAt - now());
+      return timer.remaining;
+    }
+    function nextAfter(t) {
+      if (t.phase === 'focus') return t.round >= settings.rounds ? fresh('long', t.round) : fresh('short', t.round);
+      if (t.phase === 'short') return fresh('focus', Math.min(t.round + 1, settings.rounds));
+      return fresh('focus', 1);
+    }
+
+    /* If a running session has passed its end time, complete it exactly once. */
+    function sync() {
+      if (timer.status !== 'running' || now() < timer.endAt) return null;
+      var done = timer, endedAt = done.endAt, recorded = false;
+      if (done.phase === 'focus' && !history.some(function (h) { return h.id === done.id; })) {
+        history.push({ id: done.id, type: 'focus', duration: done.duration, start: done.startedAt, end: endedAt, task: task || '' });
+        if (history.length > HISTORY_CAP) history = history.slice(-HISTORY_CAP);
+        saveHistory(); // history is written before the timer, and deduped by id, so a crash between the two can't double count
+        recorded = true;
+      }
+      timer = nextAfter(done);
+      timer.ended = { phase: done.phase, at: endedAt };
+      saveTimer();
+      return { phase: done.phase, at: endedAt, next: timer.phase, recorded: recorded };
+    }
+
+    function start() {
+      if (sync()) return; // never start straight into the next session on the same press
+      if (timer.status === 'idle') {
+        var t = now();
+        timer.status = 'running'; timer.startedAt = t; timer.endAt = t + timer.remaining; timer.ended = null;
+      } else if (timer.status === 'paused') {
+        timer.status = 'running'; timer.endAt = now() + timer.remaining;
+      } else return;
+      saveTimer();
+    }
+    function pause() {
+      if (timer.status !== 'running') return;
+      if (sync()) return;
+      timer.remaining = Math.max(0, timer.endAt - now());
+      timer.status = 'paused'; timer.endAt = null;
+      saveTimer();
+    }
+    function reset() {
+      sync();
+      timer = fresh(timer.phase, timer.round);
+      saveTimer();
+    }
+    function skip() {
+      if (sync()) return;
+      timer = nextAfter(timer); // unfinished sessions are never recorded
+      saveTimer();
+    }
+    function setSettings(patch) {
+      var merged = {}, k;
+      for (k in settings) merged[k] = settings[k];
+      for (k in patch) merged[k] = patch[k];
+      settings = cleanSettings(merged);
+      store.set('settings', settings);
+      if (timer.round > settings.rounds) timer.round = settings.rounds;
+      if (timer.status === 'idle') { timer.duration = durationFor(timer.phase); timer.remaining = timer.duration; }
+      saveTimer();
+    }
+    function setTask(v) { task = String(v || '').replace(/\s+/g, ' ').trim().slice(0, 80); store.set('task', task); }
+    function clearHistory() { history = []; saveHistory(); }
+    function dismissEnded() { if (timer.ended) { timer.ended = null; saveTimer(); } }
+
+    load();
+    return {
+      sync: sync, start: start, pause: pause, reset: reset, skip: skip,
+      setSettings: setSettings, setTask: setTask, clearHistory: clearHistory, dismissEnded: dismissEnded,
+      reload: load, remaining: remaining,
+      get timer() { return timer; }, get settings() { return settings; },
+      get history() { return history; }, get task() { return task; }
+    };
+  }
+
+  /* ---- statistics, derived from history only, grouped by local date ---- */
+  function dayKey(ts) { var d = new Date(ts); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function startOfDay(ts) { var d = new Date(ts); d.setHours(0, 0, 0, 0); return d; }
+  function weekStart(ts) { var d = startOfDay(ts); var dow = (d.getDay() + 6) % 7; d.setDate(d.getDate() - dow); return d; }
+  function stats(history, nowTs, goalMin) {
+    var todayK = dayKey(nowTs), today = { count: 0, ms: 0 };
+    var ws = weekStart(nowTs), days = [], i;
+    for (i = 0; i < 7; i++) { var d = new Date(ws); d.setDate(ws.getDate() + i); days.push({ key: dayKey(d.getTime()), date: d, ms: 0 }); }
+    var idx = {}; days.forEach(function (d, j) { idx[d.key] = j; });
+    history.forEach(function (h) {
+      var k = dayKey(h.end);
+      if (k === todayK) { today.count++; today.ms += h.duration; }
+      if (k in idx) days[idx[k]].ms += h.duration;
+    });
+    var todayIdx = idx[todayK];
+    var weekMs = days.reduce(function (a, d) { return a + d.ms; }, 0);
+    return {
+      today: today, goalMs: goalMin * MIN, days: days, todayIdx: todayIdx,
+      weekMs: weekMs, avgMs: weekMs / (todayIdx + 1)
+    };
+  }
+
+  return { create: create, stats: stats, clampSetting: clampSetting, DEFAULTS: DEFAULTS, LIMITS: LIMITS, dayKey: dayKey };
+})();
+</script>
+<!-- ENGINE:END -->
+
+<script>
+{
+  /* ---------- storage (falls back to memory if blocked) ---------- */
+  const mem = {};
+  const KEY = k => 'still.v1.' + k;
+  const store = {
+    get(k) { try { const v = localStorage.getItem(KEY(k)); return v == null ? (mem[k] ?? null) : JSON.parse(v); } catch (e) { return mem[k] ?? null; } },
+    set(k, v) { mem[k] = v; try { localStorage.setItem(KEY(k), JSON.stringify(v)); } catch (e) {} }
+  };
+  const E = StillEngine.create({ store });
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const NAMES = { focus: 'Focus', short: 'Short break', long: 'Long break' };
+  const C = 2 * Math.PI * 140;
+  const prog = $('prog'); prog.style.strokeDasharray = C;
+
+  /* ---------- formatting ---------- */
+  const clock = ms => { const s = Math.ceil(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+  const dur = ms => { const m = Math.round(ms / 60000); if (m < 60) return m + 'm'; const h = Math.floor(m / 60), r = m % 60; return r ? h + 'h ' + r + 'm' : h + 'h'; };
+  const short = ms => { const m = Math.round(ms / 60000); return m < 60 ? m + 'm' : (m / 60).toFixed(m % 60 ? 1 : 0) + 'h'; };
+  const timeOf = ts => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const whenOf = ts => {
+    const k = StillEngine.dayKey(ts), now = Date.now();
+    if (k === StillEngine.dayKey(now)) return 'Today, ' + timeOf(ts);
+    if (k === StillEngine.dayKey(now - 864e5)) return 'Yesterday, ' + timeOf(ts);
+    return new Date(ts).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ', ' + timeOf(ts);
+  };
+
+  /* ---------- routing ---------- */
+  const ROUTES = { focus: 'focus', statistics: 'stats', preferences: 'prefs' };
+  function route() {
+    const v = ROUTES[location.hash.slice(1)] || 'focus';
+    document.querySelectorAll('.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
+    document.querySelectorAll('nav a').forEach(a => a.setAttribute('aria-current', a.dataset.v === v ? 'page' : 'false'));
+    if (v === 'stats') renderStats();
+    if (v === 'prefs') renderPrefs();
+    window.scrollTo(0, 0);
+  }
+  addEventListener('hashchange', route);
+
+  /* ---------- focus screen ---------- */
+  let lastPhase = null;
+  function renderTimer() {
+    const t = E.timer, s = E.settings, rem = E.remaining();
+    $('clock').textContent = clock(rem);
+    prog.style.strokeDashoffset = C * (1 - (t.duration ? rem / t.duration : 0));
+    const ph = $('phase');
+    if (lastPhase !== t.phase) { ph.textContent = NAMES[t.phase]; if (lastPhase) { ph.classList.remove('swap'); void ph.offsetWidth; ph.classList.add('swap'); } lastPhase = t.phase; }
+    $('round').textContent = 'Session ' + Math.min(t.round, s.rounds) + ' of ' + s.rounds;
+    let dots = '';
+    for (let i = 1; i <= s.rounds; i++) dots += '<i class="' + (i < t.round || (i === t.round && t.phase !== 'focus') ? 'done' : i === t.round ? 'now' : '') + '"></i>';
+    $('dots').innerHTML = dots;
+    $('state').textContent = t.status === 'running' ? 'Ends at ' + timeOf(t.endAt) : t.status === 'paused' ? 'Paused' : t.phase === 'focus' ? 'Ready to focus' : 'Ready for a break';
+    $('ring').classList.toggle('paused', t.status === 'paused');
+    const main = $('btn-main');
+    main.textContent = t.status === 'running' ? 'Pause' : t.status === 'paused' ? 'Resume' : 'Start';
+    main.classList.toggle('soft', t.status === 'running');
+    $('btn-reset').disabled = t.status === 'idle';
+    const note = $('note');
+    if (t.ended) {
+      note.textContent = t.ended.phase === 'focus'
+        ? 'Focus complete at ' + timeOf(t.ended.at) + '. Your ' + NAMES[t.phase].toLowerCase() + ' is ready when you are.'
+        : 'Break over. Press Start when you’re ready to focus.';
+      note.classList.add('show');
+    } else note.classList.remove('show');
+    document.title = t.status === 'running' ? clock(rem) + ' · ' + NAMES[t.phase] + ' – Still' : 'Still';
+  }
+  function renderToday() {
+    const st = StillEngine.stats(E.history, Date.now(), E.settings.goal);
+    const pct = Math.round(st.today.ms / st.goalMs * 100);
+    $('d-count').textContent = st.today.count;
+    $('d-unit').textContent = st.today.count === 1 ? 'session' : 'sessions';
+    $('d-time').textContent = dur(st.today.ms);
+    $('d-pct').textContent = pct + '%';
+    $('d-bar').style.width = Math.min(100, pct) + '%';
+    $('today-date').textContent = new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+    return st;
+  }
+  function renderTask() {
+    const has = !!E.task;
+    $('task-text').textContent = has ? E.task : 'What are you working on?';
+    $('task-btn').classList.toggle('has', has);
+    $('task-btn').setAttribute('aria-label', has ? 'Edit task: ' + E.task : 'Add a task');
+  }
+  function renderAll() { renderTimer(); renderToday(); renderTask(); if ($('v-stats').classList.contains('on')) renderStats(); }
+
+  /* ---------- the tick: timestamps decide, the loop only repaints ---------- */
+  let loopT = 0, endT = 0;
+  function tick() {
+    clearTimeout(loopT); clearTimeout(endT);
+    const done = E.sync();
+    if (done) onComplete(done);
+    renderTimer();
+    if (E.timer.status === 'running') {
+      if (!document.hidden) loopT = setTimeout(tick, 250);
+      endT = setTimeout(tick, E.remaining() + 30); // fires even when hidden, if the browser lets it
+    }
+  }
+  ['visibilitychange', 'focus', 'pageshow'].forEach(ev => addEventListener(ev, () => { if (!document.hidden) { renderToday(); tick(); } }));
+  addEventListener('storage', e => { if (e.key && e.key.startsWith('still.v1.')) { E.reload(); renderAll(); tick(); } });
+
+  function onComplete(done) {
+    renderToday();
+    if ($('v-stats').classList.contains('on')) renderStats();
+    const ring = $('ring'); ring.classList.remove('done'); void ring.offsetWidth; ring.classList.add('done');
+    const fresh = Date.now() - done.at < 90000; // don't chime for a session that ended hours ago
+    const msg = done.phase === 'focus' ? 'Focus session complete' : 'Break complete';
+    const body = done.phase === 'focus' ? 'Your ' + NAMES[done.next].toLowerCase() + ' is ready.' : 'Ready for the next focus session.';
+    if (!$('v-focus').classList.contains('on')) toast(msg + '. ' + body);
+    if (fresh && E.settings.sound) { chime(); try { navigator.vibrate && navigator.vibrate([90, 70, 90]); } catch (e) {} }
+    if (fresh && E.settings.notify) notify(msg, body);
+  }
+
+  /* ---------- sound + notifications ---------- */
+  let actx = null;
+  function unlockAudio() { try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {} }
+  function chime() {
+    if (!actx) return;
+    try {
+      const t0 = actx.currentTime;
+      [[660, 0], [880, .22]].forEach(([f, d]) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0, t0 + d); g.gain.linearRampToValueAtTime(.18, t0 + d + .02); g.gain.exponentialRampToValueAtTime(.0001, t0 + d + 1.2);
+        o.connect(g).connect(actx.destination); o.start(t0 + d); o.stop(t0 + d + 1.3);
+      });
+    } catch (e) {}
+  }
+  let swReg = null;
+  const notifSupported = () => { try { return 'Notification' in window && window.isSecureContext; } catch (e) { return false; } };
+  async function notify(title, body) {
+    try {
+      if (!notifSupported() || Notification.permission !== 'granted') return;
+      const o = { body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: 'still-session', renotify: true };
+      if (swReg && swReg.showNotification) await swReg.showNotification(title, o); else new Notification(title, o);
+    } catch (e) {}
+  }
+
+  /* ---------- controls ---------- */
+  $('btn-main').addEventListener('click', () => {
+    unlockAudio();
+    const s = E.timer.status;
+    if (s === 'running') E.pause();
+    else {
+      const wasIdle = s === 'idle';
+      E.start();
+      if (wasIdle && E.timer.status === 'running') { const r = $('ring'); r.classList.remove('kick'); void r.offsetWidth; r.classList.add('kick'); }
+    }
+    tick();
+  });
+  const inProgress = () => E.timer.status !== 'idle' && E.remaining() < E.timer.duration - 1000;
+  $('btn-reset').addEventListener('click', () => {
+    const go = () => { E.reset(); tick(); };
+    inProgress() ? confirmDlg('Reset this session?', 'The timer goes back to ' + clock(E.timer.duration) + '. This session won’t be counted.', 'Reset', go) : go();
+  });
+  $('btn-skip').addEventListener('click', () => {
+    const go = () => { E.skip(); tick(); };
+    const t = E.timer;
+    if (t.phase === 'focus' && inProgress()) confirmDlg('Skip this focus session?', 'It ends now and won’t be counted as completed.', 'Skip', go);
+    else go();
+  });
+  addEventListener('keydown', e => {
+    if (e.target.closest('input,button,a,[role=switch]') || !$('v-focus').classList.contains('on') || $('scrim').classList.contains('show')) return;
+    if (e.code === 'Space') { e.preventDefault(); $('btn-main').click(); }
+  });
+
+  /* task */
+  const task = $('task'), input = $('task-input');
+  function openTask() { task.classList.add('editing'); input.value = E.task; input.focus(); }
+  function closeTask() { E.setTask(input.value); task.classList.remove('editing'); renderTask(); }
+  $('task-btn').addEventListener('click', openTask);
+  $('task-form').addEventListener('submit', e => { e.preventDefault(); input.blur(); });
+  input.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== $('task-clear')) closeTask(); }, 0));
+  input.addEventListener('keydown', e => { if (e.key === 'Escape') { input.value = E.task; input.blur(); } });
+  $('task-clear').addEventListener('click', () => { input.value = ''; closeTask(); });
+
+  /* ---------- statistics screen ---------- */
+  let histShown = 20;
+  function renderStats() {
+    const st = renderToday();
+    const pct = Math.round(st.today.ms / st.goalMs * 100);
+    $('s-count').textContent = st.today.count;
+    $('s-time').textContent = dur(st.today.ms);
+    $('s-pct').textContent = pct + '%';
+    $('s-bar').style.width = Math.min(100, pct) + '%';
+    $('s-goaltext').textContent = dur(st.today.ms) + ' of ' + dur(st.goalMs) + ' goal';
+    const left = st.goalMs - st.today.ms;
+    $('s-left').textContent = left > 0 ? dur(left) + ' to go' : 'Goal reached';
+
+    const max = Math.max(st.goalMs, ...st.days.map(d => d.ms));
+    const L = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const plot = 180 - 20 - 16 - 26; // chart height minus padding, value label, day label
+    const goalY = 26 + plot * (st.goalMs / max);
+    $('chart').innerHTML = st.days.map((d, i) =>
+      '<div class="col' + (i === st.todayIdx ? ' now' : '') + '"><span class="v">' + (d.ms ? short(d.ms) : '') + '</span>' +
+      '<span class="b' + (d.ms ? '' : ' zero') + '" style="height:' + (d.ms ? Math.max(3, d.ms / max * plot) : 2) + 'px"></span>' +
+      '<span class="d" title="' + esc(d.date.toLocaleDateString([], { weekday: 'long' })) + '">' + L[i] + '</span></div>').join('') +
+      '<div class="goalmark" style="bottom:' + goalY + 'px"><span>Goal ' + short(st.goalMs) + '</span></div>';
+    $('chart').setAttribute('aria-label', 'Focus time this week: ' + st.days.map((d, i) => d.date.toLocaleDateString([], { weekday: 'short' }) + ' ' + dur(d.ms)).join(', '));
+    $('w-total').textContent = dur(st.weekMs);
+    $('w-avg').textContent = dur(st.avgMs);
+
+    const h = E.history.slice().sort((a, b) => b.end - a.end);
+    $('hist').innerHTML = h.length ? h.slice(0, histShown).map(x =>
+      '<li><div class="t"><div class="' + (x.task ? '' : 'none') + '">' + esc(x.task || 'Focus session') + '</div><small>' + esc(whenOf(x.end)) + '</small></div><span class="m">' + dur(x.duration) + '</span></li>').join('')
+      : '<li class="empty">No completed sessions yet. Finish a focus session and it will appear here.</li>';
+    $('hist-more').hidden = h.length <= histShown;
+  }
+  $('hist-more').addEventListener('click', () => { histShown += 30; renderStats(); });
+
+  /* ---------- settings screen ---------- */
+  const minus = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 12h12"/></svg>';
+  const plus = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg>';
+  const FIELDS = [
+    ['g-timer', 'focus', 'Focus', 'minutes', 1], ['g-timer', 'short', 'Short break', 'minutes', 1], ['g-timer', 'long', 'Long break', 'minutes', 1],
+    ['g-timer', 'rounds', 'Long break after', 'focus sessions', 1], ['g-goal', 'goal', 'Daily focus target', 'minutes', 5]
+  ];
+  FIELDS.forEach(([g, k, label, unit, step]) => {
+    const [lo, hi] = StillEngine.LIMITS[k];
+    $(g).insertAdjacentHTML('beforeend',
+      '<div class="set"><div class="lab"><div>' + label + '</div><small id="h-' + k + '" data-unit="' + unit + '"></small></div>' +
+      '<div class="step"><button type="button" data-k="' + k + '" data-d="-' + step + '" aria-label="Decrease ' + label + '">' + minus + '</button>' +
+      '<input id="f-' + k + '" type="number" inputmode="numeric" min="' + lo + '" max="' + hi + '" step="' + step + '" aria-label="' + label + ' (' + unit + ')">' +
+      '<button type="button" data-k="' + k + '" data-d="' + step + '" aria-label="Increase ' + label + '">' + plus + '</button></div></div>');
+  });
+  function hint(k, err) {
+    const el = $('h-' + k), [lo, hi] = StillEngine.LIMITS[k], v = E.settings[k];
+    el.classList.toggle('err', !!err);
+    el.textContent = err || (k === 'goal' ? v + ' minutes · ' + dur(v * 60000) : v + ' ' + (v === 1 ? el.dataset.unit.replace(/s$/, '') : el.dataset.unit));
+  }
+  function renderPrefs() {
+    FIELDS.forEach(([, k]) => { $('f-' + k).value = E.settings[k]; hint(k); });
+    $('sw-sound').setAttribute('aria-checked', E.settings.sound);
+    const sup = notifSupported();
+    const granted = sup && Notification.permission === 'granted';
+    $('sw-notify').setAttribute('aria-checked', E.settings.notify && granted);
+    $('notify-hint').textContent = !sup ? 'Not available in this browser view. Open Still from its own web address to use notifications.'
+      : Notification.permission === 'denied' ? 'Notifications are blocked for this site in your browser settings.'
+      : 'Shows a system notification where your browser allows it.';
+  }
+  function commit(k, raw) {
+    const [lo, hi] = StillEngine.LIMITS[k], v = StillEngine.clampSetting(k, raw);
+    let err = '';
+    if (v === null) err = 'Enter a number between ' + lo + ' and ' + hi + '.';
+    else if (Number(raw) !== v) err = Number(raw) < lo ? 'Minimum is ' + lo + '.' : Number(raw) > hi ? 'Maximum is ' + hi + '.' : '';
+    if (v !== null && v !== E.settings[k]) { E.setSettings({ [k]: v }); renderAll(); }
+    $('f-' + k).value = E.settings[k];
+    hint(k, err);
+    if (err) setTimeout(() => hint(k), 2600);
+  }
+  document.querySelectorAll('.step button').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.k; commit(k, E.settings[k] + Number(b.dataset.d));
+  }));
+  FIELDS.forEach(([, k]) => {
+    const f = $('f-' + k);
+    f.addEventListener('change', () => commit(k, f.value));
+    f.addEventListener('keydown', e => { if (e.key === 'Enter') f.blur(); });
+  });
+  $('sw-sound').addEventListener('click', () => { unlockAudio(); E.setSettings({ sound: !E.settings.sound }); renderPrefs(); if (E.settings.sound) chime(); });
+  $('sw-notify').addEventListener('click', async () => {
+    if (E.settings.notify && notifSupported() && Notification.permission === 'granted') { E.setSettings({ notify: false }); return renderPrefs(); }
+    if (!notifSupported()) { renderPrefs(); return toast('Notifications aren’t available here.'); }
+    let p = Notification.permission;
+    try { if (p === 'default') p = await Notification.requestPermission(); } catch (e) { p = 'denied'; }
+    E.setSettings({ notify: p === 'granted' });
+    renderPrefs();
+    if (p !== 'granted') toast('Notifications weren’t allowed.');
+  });
+  $('btn-defaults').addEventListener('click', () => confirmDlg('Restore default settings?', '25 minute focus, 5 and 15 minute breaks, a long break every 4 sessions and a 2 hour goal. Your history stays.', 'Restore', () => {
+    const d = StillEngine.DEFAULTS; E.setSettings({ focus: d.focus, short: d.short, long: d.long, rounds: d.rounds, goal: d.goal }); renderPrefs(); renderAll(); toast('Defaults restored.');
+  }));
+  $('btn-clear').addEventListener('click', () => {
+    if (!E.history.length) return toast('There’s no history to clear.');
+    confirmDlg('Clear all session history?', 'This permanently removes ' + E.history.length + ' completed session' + (E.history.length === 1 ? '' : 's') + ' and resets your statistics. It can’t be undone.', 'Clear history', () => { E.clearHistory(); renderAll(); toast('History cleared.'); }, true);
+  });
+
+  /* ---------- toast + confirm dialog ---------- */
+  let toastT = 0;
+  function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3200); }
+  let dlgGo = null, dlgPrev = null;
+  function confirmDlg(title, body, ok, go, danger) {
+    $('dlg-title').textContent = title; $('dlg-body').textContent = body;
+    const b = $('dlg-ok'); b.textContent = ok; b.classList.toggle('danger', !!danger);
+    dlgGo = go; dlgPrev = document.activeElement;
+    $('scrim').classList.add('show'); setTimeout(() => $('dlg-cancel').focus(), 30);
+  }
+  function closeDlg(run) { $('scrim').classList.remove('show'); const g = dlgGo; dlgGo = null; if (dlgPrev) dlgPrev.focus(); if (run && g) g(); }
+  $('dlg-ok').addEventListener('click', () => closeDlg(true));
+  $('dlg-cancel').addEventListener('click', () => closeDlg(false));
+  $('scrim').addEventListener('click', e => { if (e.target.id === 'scrim') closeDlg(false); });
+  addEventListener('keydown', e => { if (e.key === 'Escape' && $('scrim').classList.contains('show')) closeDlg(false); });
+
+  /* ---------- environment: PWA where possible, honest where not ---------- */
+  let framed = false; try { framed = window.self !== window.top; } catch (e) { framed = true; }
+  $('env-note').textContent = framed
+    ? 'You’re using Still inside another page, which can’t install to your home screen, work offline or send notifications. Host it at its own address to get all three.'
+    : (matchMedia('(display-mode: standalone)').matches || navigator.standalone) ? 'Installed on this device. The timer works offline.'
+    : 'To install, use your browser’s Add to Home Screen. After the first load, the timer works offline.';
+  if (!framed && 'serviceWorker' in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register('sw.js').then(r => { swReg = r; }).catch(() => {});
+  }
+
+  /* ---------- go ---------- */
+  setInterval(() => { if (!document.hidden) renderToday(); }, 60000); // keeps the date and daily totals right past midnight
+  route(); renderAll(); tick();
+}
+</script>
+</body>
+</html>
