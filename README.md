@@ -1,6 +1,6 @@
 # Still
 
-A quieter way to get things done. A minimalist Pomodoro PWA in plain HTML, CSS and JavaScript, with no build step and no dependencies.
+A minimalist Pomodoro PWA in plain HTML, CSS and JavaScript, with no build step and no dependencies.
 
 ## Files
 - `index.html`: the whole app (timer engine, Focus, Statistics, Settings)
